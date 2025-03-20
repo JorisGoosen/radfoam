@@ -68,29 +68,48 @@ def main(args):
                     biggestOne = r
     
     print("Biggest one was " + str(biggestOne))
-    rechterPad = os.path.join(data_dir, "rechter")
-    os.makedirs(rechterPad, exist_ok=True)    
-    inames=[]
-    allinames=[]
-    for image in tqdm.tqdm(list(reconstruction.images.values())):
-        inames.append(image.name)
-    
-    for r in range(len(reconstructions)):
-        for image in tqdm.tqdm(list(reconstructions[r].images.values())):
-            if not image.name in allinames:
-                allinames.append(image.name)
-        rechteImgs = os.path.join(data_dir, "rechter" + str(r))
-        pycolmap.undistort_images(output_path=rechteImgs, input_path=os.path.join(data_dir, "sparse", str(r)), image_path=os.path.join(data_dir, "images"), image_names=inames)
-        dir_path = os.path.join(rechteImgs, "images")
-        for file_path in os.listdir(dir_path):
-            src = os.path.join(dir_path, file_path)
-            if os.path.isfile(src):
-                shutil.copy(src, os.path.join(rechterPad, file_path))
+
+
+    isItPinhole = args.camera_model == "PINHOLE"
+    isItFishEye = "FISHEYE" in args.camera_model
+    undistortMe = not isItPinhole and not isItFishEye
+
+    output_dir = data_dir
+
+    if undistortMe:
+        #Then we should undistort everything somewhere
+        output_dir = os.path.join(data_dir, "rechter"+os.path.basename(data_dir) )
+        rechterPad = os.path.join(output_dir, "images")
+        os.makedirs(rechterPad, exist_ok=True)    
+        inames=[]
+        allinames=[]
+        for image in tqdm.tqdm(list(reconstruction.images.values())):
+            inames.append(image.name)
+        
+        for r in range(len(reconstructions)):
+            for image in tqdm.tqdm(list(reconstructions[r].images.values())):
+                if not image.name in allinames:
+                    allinames.append(image.name)
+
+            rechteImgs = os.path.join(output_dir, "reco" + str(r))
+
+            pycolmap.undistort_images(
+                output_path=rechteImgs, 
+                input_path=os.path.join(data_dir, "sparse", str(r)), 
+                image_path=os.path.join(data_dir, "images"), 
+                image_names=allinames)
+            dir_path = os.path.join(rechteImgs, "images")
+
+            for file_path in os.listdir(dir_path):
+                src = os.path.join(dir_path, file_path)
+                if os.path.isfile(src):
+                    shutil.copy(src, os.path.join(rechterPad, file_path))
+        # now all undistorted stuff lives in rechterPad so data/rechter/images
         
 
-    os.makedirs(os.path.join(data_dir, "images_2"), exist_ok=True)
-    os.makedirs(os.path.join(data_dir, "images_4"), exist_ok=True)
-    os.makedirs(os.path.join(data_dir, "images_8"), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, "images_2"), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, "images_4"), exist_ok=True)
+    os.makedirs(os.path.join(output_dir, "images_8"), exist_ok=True)
 
     print("Downsampling images")
 
@@ -98,15 +117,20 @@ def main(args):
     baseH = -1
 
     for imagename in allinames:
-        image_1_path = os.path.join(rechterPad, imagename)
-        image_2_path = os.path.join(data_dir, "images_2", imagename)
-        image_4_path = os.path.join(data_dir, "images_4", imagename)
-        image_8_path = os.path.join(data_dir, "images_8", imagename)
+        image_1_path = os.path.join(output_dir, "images",   imagename)
+        image_2_path = os.path.join(output_dir, "images_2", imagename)
+        image_4_path = os.path.join(output_dir, "images_4", imagename)
+        image_8_path = os.path.join(output_dir, "images_8", imagename)
 
         pil_image = Image.open(image_1_path)
         if baseW == -1:
             baseH = pil_image.height
             baseW = pil_image.width
+
+        #force everything to be the same size
+        if baseW != pil_image.width or baseH != pil_image.height:
+            pil_image = pil_image.resize((baseW, baseH), resample=Image.LANCZOS, )
+            pil_image.save(image_1_path)
 
         pil_image_2 = pil_image.resize(
             (baseW // 2, baseH // 2),
@@ -132,7 +156,10 @@ def main(args):
 
     print("Exporting point cloud")
 
-    reconstruction.export_PLY(os.path.join(data_dir, "point_cloud.ply"))
+    if undistortMe:
+        reconstruction = pycolmap.Reconstruction(os.path.join(data_dir, "sparse", str(biggestOne)))
+        shutil.copytree(os.path.join(data_dir, "sparse"), os.path.join(output_dir, "sparse"))
+    reconstruction.export_PLY(os.path.join(output_dir, "point_cloud.ply"))
 
 
 if __name__ == "__main__":
