@@ -1,18 +1,18 @@
 # Model Parameters
 sh_degree: 3
 init_points: 131_072
-final_points: 4_194_304
+final_points: 1_194_304
 activation_scale: 1
 device: cuda
 
-# Pipeline Parameters
+# Pipeline Parametersff
 iterations: 20_000
 densify_from: 2_000
 densify_until: 11_000
 densify_factor: 1.15
 white_background: true
-quantile_weight: 1e-4
-viewer: false                          # Flag to use viewer
+quantile_weight: 0
+viewer: true                          # Flag to use viewer
 debug: false                           # Flag to not use tensorboard
 
 # Optimization Parameters
@@ -27,8 +27,8 @@ freeze_points: 18_000                  # Points are frozen after this cycle
 
 # Dataset Parameters
 dataset: "colmap"
-data_path: "data/mipnerf360"
-scene: "garden"
+data_path: "/home/falafel/Broncode/VanAnderen/datasets/360_v2/"
+scene: "kitchen"
 patch_based: false
-downsample: [8, 4]                     # Image downsample factors
-downsample_iterations: [0, 5_000]
+downsample: [8, 4, 2, 1]                     # Image downsample factors
+downsample_iterations: [0, 3_000, 6_000, 9_000]
